@@ -1,0 +1,25 @@
+{
+  "build_id": "009d3e1ee458",
+  "flywheel_config": {
+    "path": "flywheel.toml",
+    "sha256": "795f6c182b187406b49c0b03128b8d3a2f67561aeb14d0f955ac08675176fa9c",
+    "source_path": "bench/terminal_bench/configs/tb-mini-openai.toml"
+  },
+  "flywheel_source": {
+    "commit": "86e603eec39569656677520ae5deb512218be9ee",
+    "release_tag": null,
+    "version": "0.1.3"
+  },
+  "runtime_archive": {
+    "path": "runtime/source-archive.tar.gz",
+    "sha256": "90d6b34ac5357b396a49b73a4b42523ebf4d6a50a840bfce27e5caad456fe353"
+  },
+  "schema_version": 1,
+  "shim_files": {
+    "flywheel_harbor_agent/__init__.py": "e80fa1c562844f613c5cceb3d40c59ce89611de6f5376cd933469ea7c736d721",
+    "flywheel_harbor_agent/shim.py": "d8ebbbbfcac04f80910f814ab4ba1d684bb7d27101c8c2e3029b3f935cb1ced9",
+    "flywheel_harbor_agent/trial_runtime.py": "af492e1589c0a697189eea2f8f166032217058d49ecf8ac37138a75e40c64579",
+    "pyproject.toml": "93ec2590700f1c69dbe8c8a668af66b93bf4e42d760bfa28c4c2c5264a0295ae",
+    "uv.lock": "5a197bd87ca469ba212bfcadde5bf7837766931537cc01c2d53d05a5a5e3eff7"
+  }
+}
