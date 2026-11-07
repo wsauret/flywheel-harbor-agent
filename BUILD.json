@@ -1,0 +1,30 @@
+{
+  "build_id": "671f5611863b",
+  "flywheel_config": {
+    "path": "flywheel.toml",
+    "sha256": "2b2cfd1b0122e206135d80d6817050f0e1507a738e9ee697e5ba46b6491d2670",
+    "source_path": "bench/terminal_bench/configs/tb-board-deepseek-high.toml"
+  },
+  "flywheel_source": {
+    "commit": "52a07aa7fc950456cd97729f0664139e78aea44c",
+    "release_tag": null,
+    "version": "0.1.3"
+  },
+  "runtime_archive": {
+    "path": "runtime/source-archive.tar.gz",
+    "sha256": "4856eb9b093b1a603565c49e16d9c0f268d64d922b67bd5e79f33beee5148308"
+  },
+  "schema_version": 1,
+  "shim_files": {
+    "flywheel_harbor_agent/__init__.py": "e80fa1c562844f613c5cceb3d40c59ce89611de6f5376cd933469ea7c736d721",
+    "flywheel_harbor_agent/shim.py": "7accd70f8d590e74bf89e79b636935cdd4859d4685218ecd167fa2eb4948a86a",
+    "flywheel_harbor_agent/trial_runtime.py": "aed7a81b94fcc6404e6e42be1b93866945ebfb39cf689712a1be65ace8197b14",
+    "pyproject.toml": "93ec2590700f1c69dbe8c8a668af66b93bf4e42d760bfa28c4c2c5264a0295ae",
+    "uv.lock": "5a197bd87ca469ba212bfcadde5bf7837766931537cc01c2d53d05a5a5e3eff7"
+  },
+  "store_analyzer": {
+    "path": "store-analysis/trial-store-analysis.js",
+    "sha256": "c8d1baae53d27867b9bea068d0941216b746d20167dbaa2f4078932e769f28e4",
+    "source_path": "bench/terminal_bench/trial-store-analysis.ts"
+  }
+}
