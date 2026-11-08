@@ -1,0 +1,31 @@
+{
+  "build_id": "17e4a8c0d520",
+  "flywheel_config": {
+    "path": "flywheel.toml",
+    "sha256": "2b2cfd1b0122e206135d80d6817050f0e1507a738e9ee697e5ba46b6491d2670",
+    "source_path": "bench/terminal_bench/configs/tb-board-deepseek-high.toml"
+  },
+  "flywheel_source": {
+    "commit": "59c2710c00cea30a9586f189bb778568d4b6e48a",
+    "release_tag": null,
+    "version": "0.1.3"
+  },
+  "runtime_archive": {
+    "path": "runtime/source-archive.tar.gz",
+    "sha256": "d100bd6adb67619892a1123a2be27da030bc68c0710f68568a68facc19058a5a"
+  },
+  "schema_version": 1,
+  "shim_files": {
+    "flywheel_harbor_agent/__init__.py": "e80fa1c562844f613c5cceb3d40c59ce89611de6f5376cd933469ea7c736d721",
+    "flywheel_harbor_agent/benchmark-rules.md": "c49fd0523bc75e4e0d297702502c7aca8fb0bd84c2dce60a38ebbb271d16c9dd",
+    "flywheel_harbor_agent/shim.py": "ce011c75a15fce522cafe71a00ca77aa44a49a4be53565b0c927c344cfb178b4",
+    "flywheel_harbor_agent/trial_runtime.py": "4a56c1f596908003652fe374d1ac2228c4dd027d8652227f692dd5859dcd6f21",
+    "pyproject.toml": "93ec2590700f1c69dbe8c8a668af66b93bf4e42d760bfa28c4c2c5264a0295ae",
+    "uv.lock": "5a197bd87ca469ba212bfcadde5bf7837766931537cc01c2d53d05a5a5e3eff7"
+  },
+  "store_analyzer": {
+    "path": "store-analysis/trial-store-analysis.js",
+    "sha256": "fa71c1665b805858efab49ce804ff3f4cbbbc0900380a98dcebb8334fd24df0b",
+    "source_path": "bench/terminal_bench/trial-store-analysis.ts"
+  }
+}
