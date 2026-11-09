@@ -1,0 +1,117 @@
+# Flywheel config of a Haiku arm of the Terminal-Bench 2.1 subset with every subagent type except Ship, which publishes (subagent bisect, step 4).
+# It runs Flywheel's Claude engine route on the person's Claude subscription,
+# with the token that the person made with `claude setup-token`, which the
+# trial's auth snapshot carries (PI-MODEL-082). Every role runs
+# claude-haiku-5.5 at effort high, so one model serves the whole trial.
+# The launcher validates this file with Flywheel's config schema before any
+# trial and installs it in the trial as $HOME/.flywheel/flywheel.toml under
+# the neutral auth profile id "benchmark".
+
+allow_persistent_processes = true
+# Headless shell commands write in place; the guard that stops a write
+# outside the project would refuse ordinary task setup such as package installs.
+shell_write_guard = false
+idle_compaction = false
+auto_delete_session_days = 0
+
+disabled_modules = [
+  "ask-user",
+  "bug-reports",
+  "code-mode",
+  "development",
+  "experiments",
+  "learning",
+  "mcp",
+  "papercuts",
+  "project-notifications",
+  "provider-anthropic-api",
+  "provider-chatgpt",
+  "provider-deepseek",
+  "provider-github-copilot",
+  "provider-google-api",
+  "provider-google-vertex",
+  "provider-openai-api",
+  "provider-opencode-go",
+  "provider-openrouter",
+  "provider-supergrok",
+  "remote",
+  "side-question",
+  "web",
+  "web-chatgpt",
+  "web-exa",
+  "workflows",
+]
+
+# The subagent bisect allows only these agent types; every other is unavailable.
+[subagents]
+personas = ["general", "explorer", "implementer", "advisor", "reviewer-code-quality", "reviewer-code-performance", "reviewer-code-data-integrity", "reviewer-code-security", "reviewer-code-elegance", "reviewer-code-design", "reviewer-plan-quality", "reviewer-plan-performance", "reviewer-plan-data-integrity", "reviewer-plan-security", "reviewer-plan-elegance", "reviewer-plan-design", "reviewer-mechanism", "reviewer-uat"]
+
+[updates]
+auto_install = false
+
+[profiles.benchmark]
+allow_training_routes = false
+
+[profiles.benchmark.roles.chat]
+model = "claude-haiku-5.5"
+effort = "high"
+
+[profiles.benchmark.roles.title-generation]
+model = "claude-haiku-5.5"
+effort = "high"
+
+[profiles.benchmark.roles.subagent-summary]
+model = "claude-haiku-5.5"
+effort = "high"
+
+[profiles.benchmark.roles.explorer]
+model = "claude-haiku-5.5"
+effort = "high"
+
+[profiles.benchmark.roles.implementer]
+model = "claude-haiku-5.5"
+effort = "high"
+
+[profiles.benchmark.roles.advisor]
+model = "claude-haiku-5.5"
+effort = "high"
+
+[profiles.benchmark.roles.ship]
+model = "claude-haiku-5.5"
+effort = "high"
+
+[profiles.benchmark.roles.reviewer]
+model = "claude-haiku-5.5"
+effort = "high"
+
+[profiles.benchmark.roles.reviewer-quality]
+model = "claude-haiku-5.5"
+effort = "high"
+
+[profiles.benchmark.roles.reviewer-elegance]
+model = "claude-haiku-5.5"
+effort = "high"
+
+[profiles.benchmark.roles.reviewer-design]
+model = "claude-haiku-5.5"
+effort = "high"
+
+[profiles.benchmark.roles.reviewer-data-integrity]
+model = "claude-haiku-5.5"
+effort = "high"
+
+[profiles.benchmark.roles.reviewer-performance]
+model = "claude-haiku-5.5"
+effort = "high"
+
+[profiles.benchmark.roles.reviewer-security]
+model = "claude-haiku-5.5"
+effort = "high"
+
+[profiles.benchmark.roles.reviewer-mechanism]
+model = "claude-haiku-5.5"
+effort = "high"
+
+[profiles.benchmark.roles.reviewer-uat]
+model = "claude-haiku-5.5"
+effort = "high"
