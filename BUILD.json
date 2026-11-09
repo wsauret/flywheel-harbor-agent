@@ -1,0 +1,42 @@
+{
+  "benchmark_rules": {
+    "path": "flywheel_harbor_agent/benchmark-rules.md",
+    "sha256": "c49fd0523bc75e4e0d297702502c7aca8fb0bd84c2dce60a38ebbb271d16c9dd"
+  },
+  "build_id": "716db3c72be0",
+  "claude_engine": {
+    "cli_version": "2.1.306",
+    "sha256": "520bc6c1f40af466bd03a278b5ae1af1a2938bc7de5b9e5cb15526da20d71cfe",
+    "wheel": {
+      "sha256": "ecd49d21e5858c5fda46dfcca82ce1ec753df88439d99bdc459b616bac26cf98",
+      "url": "https://files.pythonhosted.org/packages/5e/8e/740bd78be8fc90b70764a136efe529eae76c3992df0b1b94b795cdbafded/claude_agent_sdk-0.2.170-py3-none-manylinux_2_17_x86_64.whl"
+    }
+  },
+  "flywheel_config": {
+    "path": "flywheel.toml",
+    "sha256": "2b2cfd1b0122e206135d80d6817050f0e1507a738e9ee697e5ba46b6491d2670",
+    "source_path": "bench/harbor/configs/tb-board-deepseek-high.toml"
+  },
+  "flywheel_source": {
+    "commit": "c40ee81d70f5dfc317b1cfdd85cb61cc1f25b93a",
+    "release_tag": null,
+    "version": "0.1.3"
+  },
+  "runtime_archive": {
+    "path": "runtime/flywheel-linux-x64.tar.xz",
+    "sha256": "3f15b181f2c7a3241e8c67336ac37f31fdb8401f1b34a4344069156f8b06ae35"
+  },
+  "schema_version": 3,
+  "shim_files": {
+    "flywheel_harbor_agent/__init__.py": "e80fa1c562844f613c5cceb3d40c59ce89611de6f5376cd933469ea7c736d721",
+    "flywheel_harbor_agent/shim.py": "3a8ebef6e46d6d21551f0acbe95c84853816299d2d9ae5cb16f6306763acf353",
+    "flywheel_harbor_agent/trial_runtime.py": "75a59de8c116a233b4885088c8bdf813ca8028574d0366b811618ff7775721d1",
+    "pyproject.toml": "b1d9a3e3e1f79b8eeb412e3ea948b382011f41611739049e549b8814f9bcc1ef",
+    "uv.lock": "afb4d44e0a69b33e97598b8f7e5860d6143fd6dbe0a7b6ea63c7362b09c9eddd"
+  },
+  "store_analyzer": {
+    "path": "store-analysis/trial-store-analysis.js",
+    "sha256": "8681abc1eb152b2d02746b4bcc75b56d19fc0f29b7f1ea5d5662ccf9ba5a1ed7",
+    "source_path": "bench/harbor/trial-store-analysis.ts"
+  }
+}
