@@ -1,0 +1,141 @@
+# Flywheel config of the DeepSeek high-effort arm with every subagent type except Ship, which
+# publishes, and the advisor, which on the parent's own model repeats the parent's reasoning
+# (subagent bisect, step 5), matched to the harness
+# leaderboard (huggingface.co/spaces/joelniklaus/harness-leaderboard): its
+# DeepSeek-V4.1-Flash September release, served by DeepInfra at fp8, at
+# reasoning effort high. Flywheel reaches it through OpenRouter, which this
+# config restricts to DeepInfra's fp8 endpoint with no fallback; the board
+# reaches DeepInfra through the Hugging Face router. The launcher validates
+# this file with Flywheel's config schema before any trial, records its
+# sha256 in run_manifest.json, and installs it in the trial as
+# $HOME/.flywheel/flywheel.toml. The trial exports its credentials under the
+# neutral auth profile id "benchmark", so the profile tables below apply.
+
+allow_persistent_processes = true
+# Headless shell commands write in place; the guard that stops a write
+# outside the project would refuse ordinary task setup such as package installs.
+shell_write_guard = false
+idle_compaction = false
+auto_delete_session_days = 0
+
+disabled_modules = [
+  "ask-user",
+  "bug-reports",
+  "code-mode",
+  "development",
+  "experiments",
+  "learning",
+  "mcp",
+  "papercuts",
+  "project-notifications",
+  "provider-anthropic-api",
+  "provider-claude-agent-sdk",
+  "provider-deepseek",
+  "provider-github-copilot",
+  "provider-google-api",
+  "provider-google-vertex",
+  "provider-openai-api",
+  "provider-chatgpt",
+  "provider-opencode-go",
+  "provider-supergrok",
+  "remote",
+  "side-question",
+  "web",
+  "web-chatgpt",
+  "web-exa",
+  "workflows",
+]
+
+# The subagent bisect allows only these agent types; every other is unavailable.
+[subagents]
+personas = ["general", "explorer", "implementer", "reviewer-code-quality", "reviewer-code-performance", "reviewer-code-data-integrity", "reviewer-code-security", "reviewer-code-elegance", "reviewer-code-design", "reviewer-plan-quality", "reviewer-plan-performance", "reviewer-plan-data-integrity", "reviewer-plan-security", "reviewer-plan-elegance", "reviewer-plan-design", "reviewer-mechanism", "reviewer-uat"]
+
+[updates]
+auto_install = false
+
+[profiles.benchmark]
+allow_training_routes = false
+
+# The board runs one model in a trial, so automatic titles use the chat route too.
+[profiles.benchmark.roles.chat]
+model = "deepseek-v4.1-flash"
+effort = "high"
+provider_options = { openrouter = { only = ["deepinfra/fp8"], allow_fallbacks = false } }
+
+[profiles.benchmark.roles.title-generation]
+model = "deepseek-v4.1-flash"
+effort = "low"
+provider_options = { openrouter = { only = ["deepinfra/fp8"], allow_fallbacks = false } }
+
+# With subagents on, every agent role and the subagent summary role run the
+# same model on the same route, because the board runs one model in a trial.
+
+[profiles.benchmark.roles.reviewer]
+model = "deepseek-v4.1-flash"
+effort = "high"
+provider_options = { openrouter = { only = ["deepinfra/fp8"], allow_fallbacks = false } }
+
+[profiles.benchmark.roles.reviewer-quality]
+model = "deepseek-v4.1-flash"
+effort = "high"
+provider_options = { openrouter = { only = ["deepinfra/fp8"], allow_fallbacks = false } }
+
+[profiles.benchmark.roles.reviewer-elegance]
+model = "deepseek-v4.1-flash"
+effort = "high"
+provider_options = { openrouter = { only = ["deepinfra/fp8"], allow_fallbacks = false } }
+
+[profiles.benchmark.roles.reviewer-design]
+model = "deepseek-v4.1-flash"
+effort = "high"
+provider_options = { openrouter = { only = ["deepinfra/fp8"], allow_fallbacks = false } }
+
+[profiles.benchmark.roles.reviewer-data-integrity]
+model = "deepseek-v4.1-flash"
+effort = "high"
+provider_options = { openrouter = { only = ["deepinfra/fp8"], allow_fallbacks = false } }
+
+[profiles.benchmark.roles.reviewer-performance]
+model = "deepseek-v4.1-flash"
+effort = "high"
+provider_options = { openrouter = { only = ["deepinfra/fp8"], allow_fallbacks = false } }
+
+[profiles.benchmark.roles.reviewer-security]
+model = "deepseek-v4.1-flash"
+effort = "high"
+provider_options = { openrouter = { only = ["deepinfra/fp8"], allow_fallbacks = false } }
+
+[profiles.benchmark.roles.reviewer-mechanism]
+model = "deepseek-v4.1-flash"
+effort = "high"
+provider_options = { openrouter = { only = ["deepinfra/fp8"], allow_fallbacks = false } }
+
+[profiles.benchmark.roles.reviewer-uat]
+model = "deepseek-v4.1-flash"
+effort = "high"
+provider_options = { openrouter = { only = ["deepinfra/fp8"], allow_fallbacks = false } }
+
+[profiles.benchmark.roles.explorer]
+model = "deepseek-v4.1-flash"
+effort = "high"
+provider_options = { openrouter = { only = ["deepinfra/fp8"], allow_fallbacks = false } }
+
+[profiles.benchmark.roles.implementer]
+model = "deepseek-v4.1-flash"
+effort = "high"
+provider_options = { openrouter = { only = ["deepinfra/fp8"], allow_fallbacks = false } }
+
+[profiles.benchmark.roles.ship]
+model = "deepseek-v4.1-flash"
+effort = "high"
+provider_options = { openrouter = { only = ["deepinfra/fp8"], allow_fallbacks = false } }
+
+[profiles.benchmark.roles.advisor]
+model = "deepseek-v4.1-flash"
+effort = "high"
+provider_options = { openrouter = { only = ["deepinfra/fp8"], allow_fallbacks = false } }
+
+[profiles.benchmark.roles.subagent-summary]
+model = "deepseek-v4.1-flash"
+effort = "high"
+provider_options = { openrouter = { only = ["deepinfra/fp8"], allow_fallbacks = false } }
