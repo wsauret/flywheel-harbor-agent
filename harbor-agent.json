@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "id": "flywheel",
+  "version": "0.1.3+98d9da8c81b3",
+  "protocol": "acp",
+  "runtime": {
+    "kind": "python-uv",
+    "python": "3.12",
+    "project": ".",
+    "lockfile": "uv.lock",
+    "entrypoint": [
+      "flywheel-acp"
+    ]
+  }
+}
