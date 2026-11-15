@@ -1,0 +1,88 @@
+# Flywheel config of a gpt-6-luna arm that turns off the advisor, reviewer, and ship agent types with subagents.disabled_types.
+# It runs the ChatGPT subscription route of the person's auth profile. Every
+# role runs gpt-6-luna at effort high, so one model serves the whole trial.
+# The launcher validates this file with Flywheel's config schema before any
+# trial and installs it in the trial as $HOME/.flywheel/flywheel.toml under
+# the neutral auth profile id "benchmark".
+
+allow_persistent_processes = true
+# Headless shell commands write in place; the guard that stops a write
+# outside the project would refuse ordinary task setup such as package installs.
+shell_write_guard = false
+idle_compaction = false
+auto_delete_session_days = 0
+
+disabled_modules = [
+  "ask-user",
+  "bug-reports",
+  "code-mode",
+  "development",
+  "experiments",
+  "learning",
+  "mcp",
+  "papercuts",
+  "project-notifications",
+  "provider-anthropic-api",
+  "provider-claude-agent-sdk",
+  "provider-deepseek",
+  "provider-github-copilot",
+  "provider-google-api",
+  "provider-google-vertex",
+  "provider-openai-api",
+  "provider-opencode-go",
+  "provider-openrouter",
+  "provider-supergrok",
+  "remote",
+  "side-question",
+  "web",
+  "web-chatgpt",
+  "web-exa",
+  "workflows",
+]
+
+# Subagents stay on with the agent types that do the task's work. The advisor and
+# the reviewers give a second opinion from another model, which a run of one
+# model cannot give, and nothing in a trial publishes.
+[subagents]
+disabled_types = ["advisor", "reviewer", "ship"]
+
+[updates]
+auto_install = false
+
+[profiles.benchmark]
+allow_training_routes = false
+
+[profiles.benchmark.roles.chat]
+model = "gpt-6-luna"
+effort = "high"
+
+[profiles.benchmark.roles.title-generation]
+model = "gpt-6-luna"
+effort = "high"
+
+[profiles.benchmark.roles.subagent-summary]
+model = "gpt-6-luna"
+effort = "high"
+
+[profiles.benchmark.roles.explorer]
+model = "gpt-6-luna"
+effort = "high"
+
+[profiles.benchmark.roles.implementer]
+model = "gpt-6-luna"
+effort = "high"
+
+[diagnostic]
+drop_prompt_parts = ["core_constraints"]
+first_block_text = '''
+CONSTRAINTS:
+- Ground each claim in evidence. Reading code settles what that code does. How a service, a dependency, or the runtime behaves is a hypothesis until a cheap probe against the real thing settles it; run that probe when the answer changes what you build.
+- Where the user was specific, their words decide. Every other choice that the request leaves open is yours: follow the request's own words, then how the codebase does the same job, then the standard of the domain. Name each such choice in your result.
+- Copy an input that cannot be regenerated before you open, repair, or run a tool on it.
+- When an approach fails, find the cause and make a targeted fix. Do not repeat the same attempt unchanged, and do not drop an approach after one failure.
+- See the work pass before you call it done. Check each requirement that the request names once, with the smallest fresh check that proves it. When that check passes, the requirement is proven: do not prove it a second way.
+- Add a test only when it protects behavior that no existing test asserts.
+- Do what the request asks and do not expand its scope. Keep public interfaces as they are unless the request changes them.
+- Never revert changes you did not make unless explicitly asked.
+- You may edit applicable AGENTS.md files without a separate permission request.
+'''
