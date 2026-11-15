@@ -1,0 +1,83 @@
+# Flywheel config of a gpt-6-luna arm that turns off the advisor, reviewer, and ship agent types with subagents.disabled_types.
+# It runs the ChatGPT subscription route of the person's auth profile. Every
+# role runs gpt-6-luna at effort high, so one model serves the whole trial.
+# The launcher validates this file with Flywheel's config schema before any
+# trial and installs it in the trial as $HOME/.flywheel/flywheel.toml under
+# the neutral auth profile id "benchmark".
+
+allow_persistent_processes = true
+# Headless shell commands write in place; the guard that stops a write
+# outside the project would refuse ordinary task setup such as package installs.
+shell_write_guard = false
+idle_compaction = false
+auto_delete_session_days = 0
+
+disabled_modules = [
+  "ask-user",
+  "bug-reports",
+  "code-mode",
+  "development",
+  "experiments",
+  "learning",
+  "mcp",
+  "papercuts",
+  "project-notifications",
+  "provider-anthropic-api",
+  "provider-claude-agent-sdk",
+  "provider-deepseek",
+  "provider-github-copilot",
+  "provider-google-api",
+  "provider-google-vertex",
+  "provider-openai-api",
+  "provider-opencode-go",
+  "provider-openrouter",
+  "provider-supergrok",
+  "remote",
+  "side-question",
+  "web",
+  "web-chatgpt",
+  "web-exa",
+  "workflows",
+]
+
+# Subagents stay on with the agent types that do the task's work. The advisor and
+# the reviewers give a second opinion from another model, which a run of one
+# model cannot give, and nothing in a trial publishes.
+[subagents]
+disabled_types = ["advisor", "reviewer", "ship"]
+
+[updates]
+auto_install = false
+
+[profiles.benchmark]
+allow_training_routes = false
+
+[profiles.benchmark.roles.chat]
+model = "gpt-6-luna"
+effort = "high"
+
+[profiles.benchmark.roles.title-generation]
+model = "gpt-6-luna"
+effort = "high"
+
+[profiles.benchmark.roles.subagent-summary]
+model = "gpt-6-luna"
+effort = "high"
+
+[profiles.benchmark.roles.explorer]
+model = "gpt-6-luna"
+effort = "high"
+
+[profiles.benchmark.roles.implementer]
+model = "gpt-6-luna"
+effort = "high"
+
+[diagnostic]
+first_block_text = '''
+# Checking your work
+When the project has tests, a build, or a way to run the code, consider using them to check that your work is complete.
+Start with the check that is closest to what you changed, so that it finds a problem fast. Widen to broader checks only as your confidence grows.
+Checks cost time. Use your judgment about how much checking the task is worth. When the closest check passes and you are confident that the work is correct, deliver the work and say in your final message what you ran and what you did not run.
+You may add a test where the nearby code shows an obvious place for one. Do not add tests to a project that has none.
+Do not fix problems that are not part of the request. You can name them in your final message.
+'''
