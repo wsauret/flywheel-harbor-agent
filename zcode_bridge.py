@@ -11,7 +11,9 @@ import json
 import os
 import re
 from pathlib import Path
+import shutil
 import signal
+import sqlite3
 import subprocess
 import sys
 import tarfile
@@ -121,8 +123,53 @@ def highest_used_percent(home, offsets):
     return highest
 
 
+class Redactor:
+    """Keeps the access token out of the trial's logs.
+
+    The agent runs as the same user as this bridge, so a tool call can read the credential file, and its output
+    then reaches every record of the conversation. The bridge therefore keeps the agent's home out of the logs,
+    passes every line that it writes or sends through `text`, and ends with `scrub`. It matches the whole token
+    and each 32-character piece of it, so a wrapped or cut copy is also removed.
+    """
+
+    MARK = "[access token removed]"
+
+    def __init__(self, token):
+        pieces = sorted({token[start:start + 32] for start in range(0, len(token) - 31, 16)} | {token[-32:]})
+        self.pattern = re.compile("|".join(map(re.escape, [token, *pieces])))
+        self.binary = re.compile(self.pattern.pattern.encode())
+
+    def text(self, value):
+        return self.pattern.sub(self.MARK, value)
+
+    def copy(self, source, target):
+        """Copy a text file into the logs without the token."""
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(self.text(source.read_text(errors="replace")))
+
+    def scrub(self, root):
+        """Rewrite each text file under root that holds the token, remove each other file that holds it, and return their count."""
+        count = 0
+        for path in root.rglob("*"):
+            if not path.is_file() or path.is_symlink():
+                continue
+            data = path.read_bytes()
+            if not self.binary.search(data):
+                continue
+            count += 1
+            try:
+                path.write_text(self.text(data.decode()))
+            except UnicodeDecodeError:
+                path.unlink()
+        return count
+
+
+REDACTOR = None
+
+
 def send(message):
-    print(json.dumps(message, ensure_ascii=False), flush=True)
+    text = json.dumps(message, ensure_ascii=False)
+    print(REDACTOR.text(text) if REDACTOR else text, flush=True)
 
 
 def update(session_id, payload):
@@ -131,25 +178,27 @@ def update(session_id, payload):
 
 def run_prompt(params, cwd, session_id):
     """Pass the task text unchanged to stock headless ZCode; retain native evidence."""
+    global REDACTOR
     logs = Path(os.environ.get("ZCODE_WRAPPER_LOGS", "/logs/agent/zcode"))
     logs.mkdir(parents=True, exist_ok=True)
+    root = Path(__file__).resolve().parent / ".runtime"
+    root.mkdir(parents=True, exist_ok=True)
     if os.environ.get("ZCODE_WRAPPER_TEST_CLI"):
         node = Path(os.environ["ZCODE_WRAPPER_TEST_NODE"])
         cli = Path(os.environ["ZCODE_WRAPPER_TEST_CLI"])
         builtin = Path(os.environ["ZCODE_WRAPPER_TEST_BUILTIN"])
     else:
-        root = Path(__file__).resolve().parent / ".runtime"
-        root.mkdir(parents=True, exist_ok=True)
         node, cli, builtin = install(root)
     key = os.environ[TOKEN_VARIABLE]
+    REDACTOR = Redactor(key)
     account = json.loads(base64.urlsafe_b64decode(key.split(".")[1] + "==="))["https://api.openai.com/auth"]["chatgpt_account_id"]
     session = str(uuid.uuid4())
     config = provider_config(key, account, session)
     recorded_config = provider_config("Harbor secret: " + TOKEN_VARIABLE, "account of the token", session)
     (logs / "provider-config.json").write_text(json.dumps(recorded_config, indent=2))
-    home = logs / "home"
-    home.mkdir(exist_ok=True)
-    descriptor, config_path = tempfile.mkstemp(prefix="zcode-provider-", suffix=".json")
+    # ZCode's home holds its session database, request records, and shell snapshots, which repeat every tool output.
+    home = Path(tempfile.mkdtemp(prefix="home-", dir=root))
+    descriptor, config_path = tempfile.mkstemp(prefix="provider-", suffix=".json", dir=home)
     try:
         with os.fdopen(descriptor, "w") as file:
             json.dump(config, file)
@@ -163,11 +212,11 @@ def run_prompt(params, cwd, session_id):
         result = None
         blocked = False
         calls, offsets, used_percent = set(), {}, 0.0
-        with (logs / "events.jsonl").open("w") as output, (logs / "stderr.txt").open("w") as errors:
+        with (logs / "events.jsonl").open("w") as output, (home / "stderr.txt").open("w") as errors:
             process = subprocess.Popen(args, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=errors, text=True, start_new_session=True)
             try:
                 for line in process.stdout:
-                    output.write(line)
+                    output.write(REDACTOR.text(line))
                     output.flush()
                     event = json.loads(line)
                     payload = event.get("payload", {})
@@ -200,22 +249,32 @@ def run_prompt(params, cwd, session_id):
                 if process.poll() is None:
                     os.killpg(process.pid, signal.SIGTERM)
                     process.wait()
-        (logs / "completion.json").write_text(json.dumps({"exit_code": exit_code, "quota_or_rate_stop": blocked, "used_percent": used_percent, "result": result}, indent=2))
-        for path in logs.rglob("*"):
-            if path.is_file() and not path.is_symlink() and key.encode() in path.read_bytes():
-                path.unlink()
-                raise RuntimeError("A native log contained the access token and was removed")
+        (logs / "completion.json").write_text(REDACTOR.text(json.dumps({"exit_code": exit_code, "quota_or_rate_stop": blocked, "used_percent": used_percent, "result": result}, indent=2)))
         if blocked:
             raise RuntimeError("Stopped on a subscription quota or rate error")
         if exit_code or result is None:
             raise RuntimeError("ZCode did not complete; inspect native artifacts")
     finally:
-        os.unlink(config_path)
+        # Only the identity and usage of each model request leave the home.
+        store = home / ".zcode/cli/db/db.sqlite"
+        if store.is_file():
+            database = sqlite3.connect(store)
+            names = ("query_source", "provider_id", "model_id", "variant", "status", "finish_reason", "input_tokens", "output_tokens",
+                     "reasoning_tokens", "cache_read_input_tokens", "started_at", "completed_at", "error_code")
+            rows = [dict(zip(names, row)) for row in database.execute(f"select {', '.join(names)} from model_usage order by started_at")]
+            database.close()
+            (logs / "model-usage.json").write_text(REDACTOR.text(json.dumps(rows, indent=1)))
+        if (home / "stderr.txt").is_file():
+            REDACTOR.copy(home / "stderr.txt", logs / "stderr.txt")
+        shutil.rmtree(home, ignore_errors=True)
+        (logs / "token-scrub.json").write_text(json.dumps({"files_that_held_the_token": REDACTOR.scrub(logs.parent)}))
 
 
 def main():
     cwd = None
     session_id = "zcode-" + uuid.uuid4().hex
+    # A stop request must still run the cleanup that keeps the token out of the logs.
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
     for line in sys.stdin:
         message = json.loads(line)
         if "id" not in message:
