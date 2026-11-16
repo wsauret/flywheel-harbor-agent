@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "id": "zcode",
+  "version": "0.17.0",
+  "protocol": "acp",
+  "runtime": {
+    "kind": "python-uv",
+    "python": "3.12",
+    "project": ".",
+    "lockfile": "uv.lock",
+    "entrypoint": ["python", "-I", "zcode_bridge.py"]
+  }
+}

@@ -1,0 +1,8 @@
+[project]
+name = "zcode-harbor-wrapper"
+version = "0.17.0"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.uv]
+package = false
