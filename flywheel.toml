@@ -1,0 +1,192 @@
+# Flywheel config of the DeepSeek 1017 max-effort arm, matched to the
+# FrontierHarness v1.1 board (frontierharness.org): every harness there runs
+# DeepSeek-V4.1-Flash-1017 at max effort, served by Baseten, 62 tasks x 4
+# attempts. This arm runs the same model at max effort on every role, over the
+# same tasks and attempts.
+#
+# Known differences from the board:
+# - Route. Flywheel resolves the one model "deepseek-v4.1-flash-1017" from
+#   three providers and walks them in its fixed spend order: the OpenCode Go
+#   subscription (included quota) first, then the DeepSeek API (first-party,
+#   wire id "deepseek-flash"), then OpenRouter. A request moves to the next
+#   provider only when one refuses for spent quota, throttling, overload, or
+#   an outage, so one trial can be served by more than one provider. Each
+#   attempt records the provider that served it.
+# - Provider. Only the OpenRouter leg is the board's own route: it is
+#   restricted to Baseten's standard endpoint with no fallback. OpenCode Go and
+#   the DeepSeek API serve the same weights through other hosts.
+# - Cost. The run's own cost mixes included use (OpenCode Go), DeepSeek list
+#   prices, and Baseten prices. Compare cost per pass with the board by
+#   repricing each trial's tokens at Baseten's list price.
+# - Effort. Max on every role, including the short title-generation role.
+#
+# The launcher validates this file with Flywheel's config schema before any
+# trial, records its sha256 in run_manifest.json, and installs it in the trial
+# as $HOME/.flywheel/flywheel.toml. The trial exports its credentials under the
+# neutral auth profile id "benchmark", so the profile tables below apply. The
+# snapshot carries the credentials of the three enabled provider modules.
+
+allow_persistent_processes = true
+# Headless shell commands write in place; the guard that stops a write
+# outside the project would refuse ordinary task setup such as package installs.
+shell_write_guard = false
+idle_compaction = false
+auto_delete_session_days = 0
+
+disabled_modules = [
+  "ask-user",
+  "bug-reports",
+  "code-mode",
+  "development",
+  "experiments",
+  "learning",
+  "mcp",
+  "papercuts",
+  "project-notifications",
+  "provider-anthropic-api",
+  "provider-claude-agent-sdk",
+  "provider-github-copilot",
+  "provider-google-api",
+  "provider-google-vertex",
+  "provider-openai-api",
+  "provider-chatgpt",
+  "provider-supergrok",
+  "remote",
+  "side-question",
+  "web",
+  "web-chatgpt",
+  "web-exa",
+  "workflows",
+]
+
+# Subagents stay on with the agent types that do the task's work. The advisor and
+# the reviewers give a second opinion from another model, which a run of one
+# model cannot give, and nothing in a trial publishes.
+[subagents]
+disabled_types = ["advisor", "reviewer", "ship"]
+
+[updates]
+auto_install = false
+
+[profiles.benchmark]
+allow_training_routes = false
+
+# The board runs one model in a trial, so automatic titles use the chat route too.
+# "baseten" matches every Baseten endpoint, so its 2x-priced fast tier is excluded by name.
+[profiles.benchmark.roles.chat]
+model = "deepseek-v4.1-flash-1017"
+effort = "max"
+provider_options = { openrouter = { only = ["baseten"], ignore = ["baseten/fast"], allow_fallbacks = false } }
+
+[profiles.benchmark.roles.explorer]
+model = "deepseek-v4.1-flash-1017"
+effort = "max"
+provider_options = { openrouter = { only = ["baseten"], ignore = ["baseten/fast"], allow_fallbacks = false } }
+
+[profiles.benchmark.roles.implementer]
+model = "deepseek-v4.1-flash-1017"
+effort = "max"
+provider_options = { openrouter = { only = ["baseten"], ignore = ["baseten/fast"], allow_fallbacks = false } }
+
+[profiles.benchmark.roles.subagent-summary]
+model = "deepseek-v4.1-flash-1017"
+effort = "max"
+provider_options = { openrouter = { only = ["baseten"], ignore = ["baseten/fast"], allow_fallbacks = false } }
+
+[profiles.benchmark.roles.title-generation]
+model = "deepseek-v4.1-flash-1017"
+effort = "max"
+provider_options = { openrouter = { only = ["baseten"], ignore = ["baseten/fast"], allow_fallbacks = false } }
+
+[diagnostic]
+drop_prompt_parts = ["core_doctrine", "core_constraints", "proportionality", "guidelines", "skills_catalog", "working_unattended", "scratchpad", "checkpoint"]
+first_block_text = '''
+You are a helpful assistant that can interact with a computer.
+
+You can execute bash commands and edit files to implement the necessary changes.
+
+## Recommended Workflow
+
+This workflow should be done step-by-step so that you can iterate on your changes and any possible problems.
+
+1. Analyze the codebase by finding and reading relevant files
+2. Create a script to reproduce the issue
+3. Edit the source code to resolve the issue
+4. Verify your fix works by running your script again
+5. Test edge cases to ensure your fix is robust
+6. Submit your changes and finish your work by issuing the following command: `echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT`.
+   Do not combine it with any other command. <important>After this command, you cannot continue working on this task.</important>
+
+## Command Execution Rules
+
+You are operating in an environment where
+
+1. You issue at least one command
+2. The system executes the command(s) in a subshell
+3. You see the result(s)
+4. You write your next command(s)
+
+Each response should include:
+
+1. **Reasoning text** where you explain your analysis and plan
+2. At least one tool call with your command
+
+**CRITICAL REQUIREMENTS:**
+
+- Your response SHOULD include reasoning text explaining what you're doing
+- Your response MUST include AT LEAST ONE bash tool call
+- Directory or environment variable changes are not persistent. Every action is executed in a new subshell.
+- However, you can prefix any action with `MY_ENV_VAR=MY_VALUE cd /path/to/working/dir && ...` or write/load environment variables from files
+- Submit your changes and finish your work by issuing the following command: `echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT`.
+  Do not combine it with any other command. <important>After this command, you cannot continue working on this task.</important>
+
+Example of a CORRECT response:
+<example_response>
+I need to understand the structure of the repository first. Let me check what files are in the current directory to get a better understanding of the codebase.
+
+[Makes bash tool call with {"command": "ls -la"} as arguments]
+</example_response>
+
+<system_information>
+Linux 4.19.0-gvisor  x86_64
+</system_information>
+
+## Useful command examples
+
+### Create a new file:
+
+```bash
+cat <<'EOF' > newfile.py
+import numpy as np
+hello = "world"
+print(hello)
+EOF
+```
+
+### Edit files with sed:```bash
+# Replace all occurrences
+sed -i 's/old_string/new_string/g' filename.py
+
+# Replace only first occurrence
+sed -i 's/old_string/new_string/' filename.py
+
+# Replace first occurrence on line 1
+sed -i '1s/old_string/new_string/' filename.py
+
+# Replace all occurrences in lines 1-10
+sed -i '1,10s/old_string/new_string/g' filename.py
+```
+
+### View file content:
+
+```bash
+# View specific lines with numbers
+nl -ba filename.py | sed -n '10,20p'
+```
+
+### Any other command you want to run
+
+```bash
+anything
+```
+'''
