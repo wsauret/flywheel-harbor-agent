@@ -178,7 +178,8 @@ def run_prompt(params, cwd, session_id):
                         break
                     if payload.get("type") in ("model_request_failed", "model_retry_scheduled"):
                         reason = json.dumps(payload).lower()
-                        if payload.get("statusCode") == 429 or any(term in reason for term in ("quota", "rate_limit", "rate limit", "insufficient_balance")):
+                        # The ChatGPT backend answers a burst of requests with a retryable 429, which ZCode retries itself.
+                        if payload.get("retryable") is not True and (payload.get("statusCode") == 429 or any(term in reason for term in ("quota", "usage_limit", "rate_limit", "rate limit", "insufficient_balance"))):
                             blocked = True
                             os.killpg(process.pid, signal.SIGTERM)
                             break
