@@ -75,8 +75,53 @@ def write_auth(home, token):
         json.dump(document, file)
 
 
+class Redactor:
+    """Keeps the access token out of the trial's logs.
+
+    The agent runs as the same user as this bridge, so a tool call can read the credential file, and its output
+    then reaches every record of the conversation. The bridge therefore keeps the agent's home out of the logs,
+    passes every line that it writes or sends through `text`, and ends with `scrub`. It matches the whole token
+    and each 32-character piece of it, so a wrapped or cut copy is also removed.
+    """
+
+    MARK = "[access token removed]"
+
+    def __init__(self, token):
+        pieces = sorted({token[start:start + 32] for start in range(0, len(token) - 31, 16)} | {token[-32:]})
+        self.pattern = re.compile("|".join(map(re.escape, [token, *pieces])))
+        self.binary = re.compile(self.pattern.pattern.encode())
+
+    def text(self, value):
+        return self.pattern.sub(self.MARK, value)
+
+    def copy(self, source, target):
+        """Copy a text file into the logs without the token."""
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(self.text(source.read_text(errors="replace")))
+
+    def scrub(self, root):
+        """Rewrite each text file under root that holds the token, remove each other file that holds it, and return their count."""
+        count = 0
+        for path in root.rglob("*"):
+            if not path.is_file() or path.is_symlink():
+                continue
+            data = path.read_bytes()
+            if not self.binary.search(data):
+                continue
+            count += 1
+            try:
+                path.write_text(self.text(data.decode()))
+            except UnicodeDecodeError:
+                path.unlink()
+        return count
+
+
+REDACTOR = None
+
+
 def send(message):
-    print(json.dumps(message, ensure_ascii=False), flush=True)
+    text = json.dumps(message, ensure_ascii=False)
+    print(REDACTOR.text(text) if REDACTOR else text, flush=True)
 
 
 def update(session_id, payload):
@@ -104,33 +149,45 @@ def forward(session_id, event, calls):
                             "status": "failed" if failed else "completed", "rawOutput": item})
 
 
-def highest_used_percent(sessions, offsets):
-    """The highest subscription usage that the new bytes of the rollouts state, or 0."""
+def mirror_rollouts(sessions, logs, offsets):
+    """Append the new complete lines of each rollout to its copy in the logs, without the token.
+
+    Returns the highest subscription usage that those lines state, or 0. The rollouts are the evidence of a
+    trial that its timeout ends, so the copy follows the run.
+    """
     highest = 0.0
     for path in sessions.rglob("rollout-*.jsonl"):
         with path.open("rb") as file:
             file.seek(offsets.get(path, 0))
             data = file.read()
-            offsets[path] = file.tell()
+        data = data[:data.rfind(b"\n") + 1]
+        if not data:
+            continue
+        offsets[path] = offsets.get(path, 0) + len(data)
+        target = logs / path.relative_to(sessions)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with target.open("a") as copy:
+            copy.write(REDACTOR.text(data.decode(errors="replace")))
         highest = max([highest, *map(float, USED_PERCENT.findall(data))])
     return highest
 
 
 def run_prompt(params, cwd, session_id):
     """Pass the task text unchanged to stock `codex exec`; retain native evidence."""
+    global REDACTOR
     logs = Path(os.environ.get("CODEX_WRAPPER_LOGS", "/logs/agent/codex"))
-    sessions = logs / "sessions"
-    sessions.mkdir(parents=True, exist_ok=True)
+    logs.mkdir(parents=True, exist_ok=True)
     root = Path(__file__).resolve().parent / ".runtime"
     root.mkdir(parents=True, exist_ok=True)
-    binary = install(root)
+    binary = Path(os.environ["CODEX_WRAPPER_TEST_BINARY"]) if os.environ.get("CODEX_WRAPPER_TEST_BINARY") else install(root)
     token = os.environ[TOKEN_VARIABLE]
+    REDACTOR = Redactor(token)
     # Codex refuses to install its helper commands when CODEX_HOME is under the temporary directory.
     home = Path(tempfile.mkdtemp(prefix="home-", dir=root))
+    offsets = {}
     try:
         write_auth(home, token)
-        # The rollouts are the evidence of a trial that its timeout ends, so Codex writes them into the logs.
-        (home / "sessions").symlink_to(sessions, target_is_directory=True)
+        sessions = home / "sessions"
         env = dict(os.environ, CODEX_HOME=str(home))
         for name in (TOKEN_VARIABLE, "OPENAI_API_KEY", "CODEX_API_KEY"):
             env.pop(name, None)
@@ -141,13 +198,13 @@ def run_prompt(params, cwd, session_id):
                 "--", prompt]
         (logs / "command.json").write_text(json.dumps({"args": args[1:-1], "version": VERSION}, indent=2))
         usage, failure, blocked, used_percent = None, None, False, 0.0
-        calls, offsets = set(), {}
-        with (logs / "events.jsonl").open("w") as output, (logs / "stderr.txt").open("w") as errors:
+        calls = set()
+        with (logs / "events.jsonl").open("w") as output, (home / "stderr.txt").open("w") as errors:
             process = subprocess.Popen(args, cwd=cwd, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                        stderr=errors, text=True, start_new_session=True)
             try:
                 for line in process.stdout:
-                    output.write(line)
+                    output.write(REDACTOR.text(line))
                     output.flush()
                     try:
                         event = json.loads(line)
@@ -157,7 +214,7 @@ def run_prompt(params, cwd, session_id):
                         usage = event.get("usage")
                     elif event.get("type") in ("turn.failed", "error"):
                         failure = json.dumps(event)[:2000]
-                    used_percent = max(used_percent, highest_used_percent(sessions, offsets))
+                    used_percent = max(used_percent, mirror_rollouts(sessions, logs / "sessions", offsets))
                     if used_percent >= USED_PERCENT_STOP or (failure and "usage limit" in failure.lower()):
                         blocked = True
                         os.killpg(process.pid, signal.SIGTERM)
@@ -168,23 +225,26 @@ def run_prompt(params, cwd, session_id):
                 if process.poll() is None:
                     os.killpg(process.pid, signal.SIGTERM)
                     process.wait()
-        (logs / "completion.json").write_text(json.dumps({
-            "exit_code": exit_code, "quota_stop": blocked, "used_percent": used_percent, "usage": usage, "failure": failure}, indent=2))
-        for path in logs.rglob("*"):
-            if path.is_file() and token.encode() in path.read_bytes():
-                path.unlink()
-                raise RuntimeError("A native log contained the access token and was removed")
+        (logs / "completion.json").write_text(REDACTOR.text(json.dumps({
+            "exit_code": exit_code, "quota_stop": blocked, "used_percent": used_percent, "usage": usage, "failure": failure}, indent=2)))
         if blocked:
             raise RuntimeError("Stopped at the subscription usage limit")
         if exit_code or usage is None:
             raise RuntimeError(f"Codex did not complete: exit {exit_code}: {failure}")
     finally:
+        if (home / "sessions").is_dir():
+            mirror_rollouts(home / "sessions", logs / "sessions", offsets)
+        if (home / "stderr.txt").is_file():
+            REDACTOR.copy(home / "stderr.txt", logs / "stderr.txt")
         shutil.rmtree(home, ignore_errors=True)
+        (logs / "token-scrub.json").write_text(json.dumps({"files_that_held_the_token": REDACTOR.scrub(logs.parent)}))
 
 
 def main():
     cwd = None
     session_id = "codex-" + uuid.uuid4().hex
+    # A stop request must still run the cleanup that keeps the token out of the logs.
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
     for line in sys.stdin:
         message = json.loads(line)
         if "id" not in message:
