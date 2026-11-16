@@ -13,8 +13,10 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
 import signal
+import sqlite3
 import subprocess
 import sys
 import tarfile
@@ -64,8 +66,53 @@ def used_percent(token, account):
         return float(json.load(response)["rate_limit"]["primary_window"]["used_percent"])
 
 
+class Redactor:
+    """Keeps the access token out of the trial's logs.
+
+    The agent runs as the same user as this bridge, so a tool call can read the credential file, and its output
+    then reaches every record of the conversation. The bridge therefore keeps the agent's home out of the logs,
+    passes every line that it writes or sends through `text`, and ends with `scrub`. It matches the whole token
+    and each 32-character piece of it, so a wrapped or cut copy is also removed.
+    """
+
+    MARK = "[access token removed]"
+
+    def __init__(self, token):
+        pieces = sorted({token[start:start + 32] for start in range(0, len(token) - 31, 16)} | {token[-32:]})
+        self.pattern = re.compile("|".join(map(re.escape, [token, *pieces])))
+        self.binary = re.compile(self.pattern.pattern.encode())
+
+    def text(self, value):
+        return self.pattern.sub(self.MARK, value)
+
+    def copy(self, source, target):
+        """Copy a text file into the logs without the token."""
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(self.text(source.read_text(errors="replace")))
+
+    def scrub(self, root):
+        """Rewrite each text file under root that holds the token, remove each other file that holds it, and return their count."""
+        count = 0
+        for path in root.rglob("*"):
+            if not path.is_file() or path.is_symlink():
+                continue
+            data = path.read_bytes()
+            if not self.binary.search(data):
+                continue
+            count += 1
+            try:
+                path.write_text(self.text(data.decode()))
+            except UnicodeDecodeError:
+                path.unlink()
+        return count
+
+
+REDACTOR = None
+
+
 def send(message):
-    print(json.dumps(message, ensure_ascii=False), flush=True)
+    text = json.dumps(message, ensure_ascii=False)
+    print(REDACTOR.text(text) if REDACTOR else text, flush=True)
 
 
 def update(session_id, payload):
@@ -87,12 +134,14 @@ def forward(session_id, event):
 
 def run_prompt(params, cwd, session_id):
     """Pass the task text unchanged to stock `opencode run`; retain native evidence."""
+    global REDACTOR
     logs = Path(os.environ.get("OPENCODE_WRAPPER_LOGS", "/logs/agent/opencode"))
     logs.mkdir(parents=True, exist_ok=True)
     root = Path(__file__).resolve().parent / ".runtime"
     root.mkdir(parents=True, exist_ok=True)
     binary = Path(os.environ["OPENCODE_WRAPPER_TEST_BINARY"]) if os.environ.get("OPENCODE_WRAPPER_TEST_BINARY") else install(root)
     token = os.environ[TOKEN_VARIABLE]
+    REDACTOR = Redactor(token)
     claims = json.loads(base64.urlsafe_b64decode(token.split(".")[1] + "==="))
     account = claims["https://api.openai.com/auth"]["chatgpt_account_id"]
     used = used_percent(token, account)
@@ -118,12 +167,12 @@ def run_prompt(params, cwd, session_id):
                 "--dangerously-skip-permissions", "--", prompt]
         (logs / "command.json").write_text(json.dumps({"args": args[1:-1], "version": VERSION, "used_percent_at_start": used}, indent=2))
         failure, steps = None, 0
-        with (logs / "events.jsonl").open("w") as output, (logs / "stderr.txt").open("w") as errors:
+        with (logs / "events.jsonl").open("w") as output, (home / "stderr.txt").open("w") as errors:
             process = subprocess.Popen(args, cwd=cwd, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                        stderr=errors, text=True, start_new_session=True)
             try:
                 for line in process.stdout:
-                    output.write(line)
+                    output.write(REDACTOR.text(line))
                     output.flush()
                     try:
                         event = json.loads(line)
@@ -139,22 +188,28 @@ def run_prompt(params, cwd, session_id):
                 if process.poll() is None:
                     os.killpg(process.pid, signal.SIGTERM)
                     process.wait()
-        for store in data.glob("opencode.db*"):
-            shutil.copy2(store, logs / store.name)
-        (logs / "completion.json").write_text(json.dumps({"exit_code": exit_code, "quota_stop": False, "steps": steps, "failure": failure}, indent=2))
-        for path in logs.rglob("*"):
-            if path.is_file() and token.encode() in path.read_bytes():
-                path.unlink()
-                raise RuntimeError("A native log contained the access token and was removed")
+        (logs / "completion.json").write_text(REDACTOR.text(json.dumps({"exit_code": exit_code, "quota_stop": False, "steps": steps, "failure": failure}, indent=2)))
         if exit_code or failure or not steps:
             raise RuntimeError(f"OpenCode did not complete: exit {exit_code}: {failure}")
     finally:
+        # The session database holds every tool output, so only the identity and usage of each message leave the home.
+        if (data / "opencode.db").is_file():
+            database = sqlite3.connect(data / "opencode.db")
+            messages = [json.loads(row[0]) for row in database.execute("select data from message")]
+            database.close()
+            kept = [{name: message.get(name) for name in ("role", "providerID", "modelID", "variant", "agent", "tokens")} for message in messages]
+            (logs / "messages.json").write_text(REDACTOR.text(json.dumps(kept, indent=1)))
+        if (home / "stderr.txt").is_file():
+            REDACTOR.copy(home / "stderr.txt", logs / "stderr.txt")
         shutil.rmtree(home, ignore_errors=True)
+        (logs / "token-scrub.json").write_text(json.dumps({"files_that_held_the_token": REDACTOR.scrub(logs.parent)}))
 
 
 def main():
     cwd = None
     session_id = "opencode-" + uuid.uuid4().hex
+    # A stop request must still run the cleanup that keeps the token out of the logs.
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
     for line in sys.stdin:
         message = json.loads(line)
         if "id" not in message:
