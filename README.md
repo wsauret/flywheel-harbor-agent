@@ -1,6 +1,10 @@
 # Harbor wrapper with OpenCode Go to OpenRouter failover
 
-This branch runs a stock reference harness on DeepSeek-V4.1-Flash-1017 at max effort. Its model requests go through `failover_proxy.py`, which sends each request to the OpenCode Go subscription first and moves it to OpenRouter, pinned to Baseten with no fallback, when Go refuses for its usage limit or saturation (status 429, 502, 503, or 529). After a refusal, later requests skip Go until the reset time that Go states, or for five minutes, and then try Go again.
+This branch runs a stock reference harness on DeepSeek-V4.1-Flash-1017 at max effort. Its model requests go through `failover_proxy.py`, which sends each request to the OpenCode Go subscription first, moves it to OpenRouter (pinned to Baseten, no fallback) while Go cannot serve, and returns to Go as soon as Go can serve again. It tracks Go's availability with the same rules as Flywheel's own provider failover:
+
+- A spent usage limit (429 `GoUsageLimitError`) holds Go back until the reset that Go states. The proxy reads that reset from Go's usage report (`/zen/go/v1/usage`). If the report gives none, it uses the error text, then a `retry-after` header, then five minutes.
+- Saturation or an outage (another 429, a 5xx, or no connection) holds Go back for 60 seconds. Each repeat doubles the hold, up to five minutes.
+- When a hold ends, one request probes Go while the other requests stay on OpenRouter. A served probe makes Go live again. A refused probe sets a new hold.
 
 The harness itself never receives a key. Give the trial `OPENCODE_API_KEY` and `OPENROUTER_API_KEY` as Harbor secrets. The bridge starts the proxy in its own process and points the harness at `http://127.0.0.1:<port>/v1`. Each request is logged to `failover-requests.jsonl` in the agent logs with the serving provider, the status, the request and response byte counts, and the duration. Keys, headers, and content are never logged.
 
